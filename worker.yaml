@@ -1,0 +1,26 @@
+version: '3'
+services:
+    worker:
+        image: chiquang98/airflow-python3.8:2.2.2
+        container_name: mobifone-airflow_worker_${WORKER_HOST}
+        restart: always
+        hostname: ${WORKER_HOST}
+        ports:
+            - 8793:8793
+        volumes:
+            - ${PATH_CODE}/dags:/usr/local/airflow/dags
+            - ${PATH_CODE}/plugins:/usr/local/airflow/plugins
+            - ${PATH_DATA}/data:/usr/local/airflow/data
+            - /etc/localtime:/etc/localtime:ro
+        environment:
+            - FERNET_KEY=46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLbfzqDDho=
+            - EXECUTOR=Celery
+            - AIRFLOW__CELERY__BROKER_URL=redis://${MASTER_HOST}:6379/1
+            - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@${MASTER_HOST}:5432/airflow
+            - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://airflow:airflow@${MASTER_HOST}:5432/airflow
+        entrypoint: airflow celery worker -H worker_${WORKER_HOST}
+        healthcheck:
+            test: [ "CMD-SHELL", "[ -f /usr/local/airflow/airflow-worker.pid ]" ]
+            interval: 30s
+            timeout: 30s
+            retries: 3
