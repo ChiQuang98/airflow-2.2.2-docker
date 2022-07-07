@@ -1,0 +1,148 @@
+version: '3'
+x-airflow-common:
+  &airflow-common
+  # In order to add custom dependencies or upgrade provider packages you can use your extended image.
+  # Comment the image line, place your Dockerfile in the directory where you placed the docker-compose.yaml
+  # and uncomment the "build" line below, Then run `docker-compose build` to build the images.
+  image: chiquang98/airflow-python3.8:2.2.2
+  # build: .
+  environment:
+    &airflow-common-env
+    AIRFLOW__CORE__EXECUTOR: CeleryExecutor
+    AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+    AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:airflow@postgres/airflow
+    AIRFLOW__CELERY__BROKER_URL: redis://:@redis:6379/0
+    AIRFLOW__CORE__FERNET_KEY: ''
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+    AIRFLOW__CORE__LOAD_EXAMPLES: 'true'
+    AIRFLOW__API__AUTH_BACKEND: 'airflow.api.auth.backend.basic_auth'
+    # _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
+    # depends_on:
+    #   &airflow-common-depends-on
+    #   redis
+    #   postgres
+services:
+    redis:
+        image: 'redis:5.0.5'
+        restart: always
+        volumes:
+            # Timezone
+            - /etc/localtime:/etc/localtime:ro
+        ports:
+            - 6379:6379
+    postgres:
+        image: postgres:9.6
+        restart: always
+        environment:
+            - POSTGRES_USER=airflow
+            - POSTGRES_PASSWORD=airflow
+            - POSTGRES_DB=airflow
+        volumes:
+            - ${PATH_DATA}/postgres:/var/lib/postgresql/data
+        ports:
+            - 5432:5432
+
+    webserver:
+        image: chiquang98/airflow-python3.8:2.2.2
+        restart: always
+        depends_on:
+            - postgres
+            - redis
+        environment:
+            # config for file entrypoint.sh
+            - LOAD_EX=n
+            - FERNET_KEY=46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLbfzqDDho=
+            - EXECUTOR=Celery
+            # overwirte file config
+            - AIRFLOW__CELERY__FLOWER_BASIC_AUTH=admin:admin
+            - AIRFLOW__WEBSERVER__SECRET_KEY=46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLbfzqDDho=
+        volumes:
+            - ${PATH_CODE}/dags:/usr/local/airflow/dags
+            - ${PATH_CODE}/plugins:/usr/local/airflow/plugins
+            - ${PATH_DATA}/data:/usr/local/airflow/data
+            # Timezone
+            - /etc/localtime:/etc/localtime:ro
+        ports:
+            - 8080:8080
+        command: webserver
+        healthcheck:
+            test: ["CMD-SHELL", "[ -f /usr/local/airflow/airflow-webserver.pid ]"]
+            interval: 30s
+            timeout: 30s
+            retries: 3
+
+    flower:
+        <<: *airflow-common
+        # image: chiquang98/airflow-python3.8:2.2.2
+        restart: always
+        depends_on:
+            - redis
+            - webserver
+        # environment:
+        #     # - EXECUTOR=Celery
+        #     # - AIRFLOW__CELERY__FLOWER_BASIC_AUTH=admin:admin
+        #     - AIRFLOW__CORE__EXECUTOR:CeleryExecutor
+        #     # - AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+        #     # - AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:airflow@postgres/airflow
+        #     # - AIRFLOW__CELERY__BROKER_URL: redis://:@redis:6379/0
+        #     # - AIRFLOW__CORE__FERNET_KEY: ''
+        #     # - AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+        #     # - AIRFLOW__CORE__LOAD_EXAMPLES: 'true'
+        #     # - AIRFLOW__API__AUTH_BACKEND: 'airflow.api.auth.backend.basic_auth'
+        volumes:
+            - /etc/localtime:/etc/localtime:ro
+        ports:
+            - 5556:5555
+        command: airflow celery flower
+        # entrypoint: airflow users  create --role Admin --username admin --email admin --firstname admin --lastname admin --password admin
+    airflow-init:
+        <<: *airflow-common
+        # entrypoint: /bin/bash
+        command: airflow users  create --role Admin --username admin --email admin --firstname admin --lastname admin --password admin
+        environment:
+          <<: *airflow-common-env
+          _AIRFLOW_DB_UPGRADE: 'true'
+          _AIRFLOW_WWW_USER_CREATE: 'true'
+          _AIRFLOW_WWW_USER_USERNAME: ${_AIRFLOW_WWW_USER_USERNAME:-airflow}
+          _AIRFLOW_WWW_USER_PASSWORD: ${_AIRFLOW_WWW_USER_PASSWORD:-airflow}
+    scheduler:
+        image: chiquang98/airflow-python3.8:2.2.2
+        restart: always
+        depends_on:
+            - webserver
+        volumes:
+            - ${PATH_CODE}/dags:/usr/local/airflow/dags
+            - ${PATH_CODE}/plugins:/usr/local/airflow/plugins
+            - ${PATH_DATA}/data:/usr/local/airflow/data
+#            # Timezone
+            - /etc/localtime:/etc/localtime:ro
+        environment:
+            - LOAD_EX=n
+            - FERNET_KEY=46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLbfzqDDho=
+            - EXECUTOR=Celery
+        command: scheduler
+
+    worker:
+        image: chiquang98/airflow-python3.8:2.2.2
+        container_name: mobifone-airflow_worker_${MASTER_HOST}
+        restart: always
+        hostname: ${MASTER_HOST}
+        ports:
+            - 8793:8793
+        volumes:
+            - ${PATH_CODE}/dags:/usr/local/airflow/dags
+            - ${PATH_CODE}/plugins:/usr/local/airflow/plugins
+            - ${PATH_DATA}/data:/usr/local/airflow/data
+            - /etc/localtime:/etc/localtime:ro
+        environment:
+            - FERNET_KEY=46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLbfzqDDho=
+            - EXECUTOR=Celery
+            - AIRFLOW__CELERY__BROKER_URL=redis://${MASTER_HOST}:6379/1
+            - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@${MASTER_HOST}:5432/airflow
+            - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://airflow:airflow@${MASTER_HOST}:5432/airflow
+        entrypoint: airflow celery worker -H worker_${MASTER_HOST}
+        healthcheck:
+            test: [ "CMD-SHELL", "[ -f /usr/local/airflow/airflow-worker.pid ]" ]
+            interval: 30s
+            timeout: 30s
+            retries: 3
