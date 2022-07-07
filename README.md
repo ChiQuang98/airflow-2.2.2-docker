@@ -6,7 +6,10 @@
 ![alt text](architecture/diagram.png)
 
 ## I. Prepare
-
+Tạo folder cùng cấp với file docker compose:
+```
+mkdir -p ./dags ./logs ./plugins ./data
+```
 ~~~~
 - Tạo file .env và cập nhật thông tin ip address trên tất cả các node (theo file .env_template):
     - PATH_DATA: đường dẫn thư mục dùng để mount data trong quá trình chạy airflow
@@ -34,6 +37,7 @@ sudo chown $USER /var/run/docker.sock
 docker build --rm --tag=mobifone/docker-airflow .
 docker-compose -f worker.yml up -d
 ```
+
 
 then setup user for admin of airfow webserver: 
 
