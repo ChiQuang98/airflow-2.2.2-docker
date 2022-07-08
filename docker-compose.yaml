@@ -60,8 +60,10 @@ services:
             - ${PATH_CODE}/dags:/usr/local/airflow/dags
             - ${PATH_CODE}/plugins:/usr/local/airflow/plugins
             - ${PATH_DATA}/data:/usr/local/airflow/data
+            - ${PATH_DATA}/logs:/usr/local/airflow/logs
             # Timezone
             - /etc/localtime:/etc/localtime:ro
+        user: "${AIRFLOW_UID:-1000}:0"
         ports:
             - 8080:8080
         command: webserver
@@ -91,6 +93,7 @@ services:
         #     # - AIRFLOW__API__AUTH_BACKEND: 'airflow.api.auth.backend.basic_auth'
         volumes:
             - /etc/localtime:/etc/localtime:ro
+        user: "${AIRFLOW_UID:-1000}:0"
         ports:
             - 5556:5555
         command: airflow celery flower
@@ -99,6 +102,7 @@ services:
         <<: *airflow-common
         # entrypoint: /bin/bash
         command: airflow users  create --role Admin --username admin --email admin --firstname admin --lastname admin --password admin
+        user: "${AIRFLOW_UID:-1000}:0"
         environment:
           <<: *airflow-common-env
           _AIRFLOW_DB_UPGRADE: 'true'
@@ -114,8 +118,10 @@ services:
             - ${PATH_CODE}/dags:/usr/local/airflow/dags
             - ${PATH_CODE}/plugins:/usr/local/airflow/plugins
             - ${PATH_DATA}/data:/usr/local/airflow/data
+            - ${PATH_DATA}/logs:/usr/local/airflow/logs
 #            # Timezone
             - /etc/localtime:/etc/localtime:ro
+        user: "${AIRFLOW_UID:-1000}:0"
         environment:
             - LOAD_EX=n
             - FERNET_KEY=46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLbfzqDDho=
@@ -133,7 +139,9 @@ services:
             - ${PATH_CODE}/dags:/usr/local/airflow/dags
             - ${PATH_CODE}/plugins:/usr/local/airflow/plugins
             - ${PATH_DATA}/data:/usr/local/airflow/data
+            - ${PATH_DATA}/logs:/usr/local/airflow/logs
             - /etc/localtime:/etc/localtime:ro
+        user: "${AIRFLOW_UID:-1000}:0"
         environment:
             - FERNET_KEY=46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLbfzqDDho=
             - EXECUTOR=Celery
