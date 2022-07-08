@@ -5,6 +5,7 @@ services:
         container_name: mobifone-airflow_worker_${WORKER_HOST}
         restart: always
         hostname: ${WORKER_HOST}
+        user: "${AIRFLOW_UID:-1000}:0"
         ports:
             - 8793:8793
         volumes:
